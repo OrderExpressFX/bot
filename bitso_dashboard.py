@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import numpy as np
+import requests
 
 # Load trade log
 @st.cache_data(ttl=60)
@@ -23,6 +25,12 @@ mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure", min_value=0.0, 
 usd_exposure_limit = st.sidebar.number_input("Max USD Exposure", min_value=0.0, value=5000.0)
 target_sell_mxn = st.sidebar.number_input("Target Sell MXN", min_value=0.0, value=10000.0)
 target_buy_usd = st.sidebar.number_input("Target Buy USD", min_value=0.0, value=1000.0)
+cost_basis = st.sidebar.number_input("USD/MXN Cost Basis", min_value=0.0, value=18.0000, format="%0.4f")
+st.sidebar.title("Trading Controls")
+mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure", min_value=0.0, value=50000.0)
+usd_exposure_limit = st.sidebar.number_input("Max USD Exposure", min_value=0.0, value=5000.0)
+target_sell_mxn = st.sidebar.number_input("Target Sell MXN", min_value=0.0, value=10000.0)
+target_buy_usd = st.sidebar.number_input("Target Buy USD", min_value=0.0, value=1000.0)
 
 # Exposure logic
 sell_mxn = data[data['side'] == 'sell']['amount'].sum()
@@ -38,7 +46,48 @@ if sell_mxn >= target_sell_mxn:
 if buy_usd >= target_buy_usd:
     st.success(f"✅ Target Buy USD achieved: {buy_usd:.2f} / {target_buy_usd:.2f}")
 
-# Display metrics
+# Bitso balance fetch (mocked API call)
+st.subheader("📡 Bitso Account Balances (demo)")
+def fetch_mock_balances():
+    return {"MXN": 72845.32, "USD": 3125.74}
+
+balances = fetch_mock_balances()
+st.metric("Available MXN", f"{balances['MXN']:,.2f}")
+st.metric("Available USD", f"{balances['USD']:,.2f}")
+
+# Volatility monitoring
+st.subheader("📉 Volatility Monitor")
+data['rolling_vol'] = data['price'].rolling(window=10).std()
+latest_vol = data['rolling_vol'].iloc[-1] if not data['rolling_vol'].isna().all() else 0.0
+st.metric("Recent Volatility (10 trades)", f"{latest_vol:.6f}")
+
+# Cumulative P&L estimation (simplified model)
+# Extended cost basis logic for buy-side as well
+buy_price_deviation = cost_basis - buy_avg if not np.isnan(buy_avg) else 0.0
+st.metric("Avg Buy vs. Cost Basis", f"{buy_price_deviation:.4f}")
+
+cost_basis_buy_pnl = (cost_basis - buy_avg) * data[data['side'] == 'buy']['amount'].sum() if not np.isnan(buy_avg) else 0.0
+st.metric("Est. Buy P&L vs. Cost Basis", f"{cost_basis_buy_pnl:,.2f}")
+st.subheader("📉 Trade vs. Cost Basis Analysis")
+st.metric("Cost Basis (USD/MXN)", f"{cost_basis:.4f}")
+
+sell_price_deviation = sell_avg - cost_basis if not np.isnan(sell_avg) else 0.0
+st.metric("Avg Sell vs. Cost Basis", f"{sell_price_deviation:.4f}")
+
+# Profit/loss using cost basis
+cost_basis_pnl = (sell_avg - cost_basis) * sell_qty if not np.isnan(sell_avg) else 0.0
+st.metric("Est. P&L vs. Cost Basis", f"{cost_basis_pnl:,.2f}")
+
+# Cumulative P&L estimation (simplified model)
+st.subheader("📊 Estimated Cumulative P&L")
+buy_avg = data[data['side'] == 'buy']['price'].mean()
+sell_avg = data[data['side'] == 'sell']['price'].mean()
+sell_qty = data[data['side'] == 'sell']['amount'].sum()
+
+est_pnl = (sell_avg - buy_avg) * sell_qty if not np.isnan(sell_avg) and not np.isnan(buy_avg) else 0.0
+st.metric("Estimated P&L (MXN)", f"{est_pnl:,.2f}")
+
+# Dashboard header
 st.title("📊 Bitso Liquidity Bot Dashboard")
 st.metric("Total Sell MXN", f"{sell_mxn:,.2f}")
 st.metric("Total Buy USD", f"{buy_usd:,.2f}")
