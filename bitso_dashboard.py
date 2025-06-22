@@ -24,12 +24,12 @@ st.sidebar.title("Trading Controls")
 autonomous_mode = st.sidebar.toggle("🤖 Autonomous Trading Mode", value=False)
 next_trade_time = st.sidebar.time_input("Next Trade Time (estimate)", value=datetime.now().time())
 st.sidebar.title("Trading Controls")
-mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure", min_value=0.0, value=8000000.0)
-usd_exposure_limit = st.sidebar.number_input("Max USD Exposure", min_value=0.0, value=450000.0)
-target_sell_mxn = st.sidebar.number_input("Target Sell MXN", min_value=0.0, value=8000000.0)
-target_sell_usd = st.sidebar.number_input("Target Sell USD", min_value=0.0, value=450000.0)
+mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure (MXN)", min_value=0.0, value=8000000.0, format="%0.2f")
+usd_exposure_limit = st.sidebar.number_input("Max USD Exposure (USD)", min_value=0.0, value=450000.0, format="%0.2f")
+target_sell_mxn = st.sidebar.number_input("Target Sell MXN (MXN)", min_value=0.0, value=8000000.0, format="%0.2f")
+target_sell_usd = st.sidebar.number_input("Target Sell USD (USD)", min_value=0.0, value=450000.0, format="%0.2f")
 cost_basis = st.sidebar.number_input("USD/MXN Cost Basis", min_value=0.0, value=18.0000, format="%0.4f")
-block_size = st.sidebar.number_input("Suggested Trade Block Size (MXN)", min_value=10000.0, value=500000.0, step=10000.0)
+block_size = st.sidebar.number_input("Suggested Trade Block Size (MXN)", min_value=10000.0, value=500000.0, step=10000.0, format="%0.2f")
 
 # Exposure logic
 sell_mxn = data[data['side'] == 'sell']['amount'].sum()
@@ -44,13 +44,13 @@ st.sidebar.progress(buy_progress, text=f"Sell USD Progress: {buy_usd:,.0f} / {ta
 
 # Alerts
 if sell_mxn >= mxn_exposure_limit:
-    st.warning(f"⚠️ MXN exposure limit reached: {sell_mxn:.2f} / {mxn_exposure_limit:.2f}")
+    st.warning(f"⚠️ MXN exposure limit reached: ${sell_mxn:,.2f} / ${mxn_exposure_limit:,.2f} MXN")
 if buy_usd >= usd_exposure_limit:
-    st.warning(f"⚠️ USD exposure limit reached: {buy_usd:.2f} / {usd_exposure_limit:.2f}")
+    st.warning(f"⚠️ USD exposure limit reached: ${buy_usd:,.2f} / ${usd_exposure_limit:,.2f} USD")
 if sell_mxn >= target_sell_mxn:
-    st.success(f"✅ Target Sell MXN achieved: {sell_mxn:.2f} / {target_sell_mxn:.2f}")
+    st.success(f"✅ Target Sell MXN achieved: ${sell_mxn:,.2f} / ${target_sell_mxn:,.2f} MXN")
 if buy_usd >= target_sell_usd:
-    st.success(f"✅ Target Sell USD achieved: {buy_usd:.2f} / {target_sell_usd:.2f}")
+    st.success(f"✅ Target Sell USD achieved: ${buy_usd:,.2f} / ${target_sell_usd:,.2f} USD")
 
 # Bitso balance fetch (mocked API call)
 st.subheader("📡 Bitso Account Balances (demo)")
@@ -58,8 +58,8 @@ def fetch_mock_balances():
     return {"MXN": 7284500.00, "USD": 312500.00}
 
 balances = fetch_mock_balances()
-st.metric("Available MXN", f"{balances['MXN']:,.2f}")
-st.metric("Available USD", f"{balances['USD']:,.2f}")
+st.metric("Available MXN", f"${balances['MXN']:,.2f} MXN")
+st.metric("Available USD", f"${balances['USD']:,.2f} USD")
 
 # Volatility monitoring
 st.subheader("📉 Volatility Monitor")
@@ -91,18 +91,18 @@ st.metric("Avg Buy vs. Cost Basis", f"{buy_price_deviation:.4f}")
 # Profit/loss using cost basis
 cost_basis_pnl = (sell_avg - cost_basis) * sell_qty if not np.isnan(sell_avg) else 0.0
 cost_basis_buy_pnl = (cost_basis - buy_avg) * data[data['side'] == 'buy']['amount'].sum() if not np.isnan(buy_avg) else 0.0
-st.metric("Est. Sell P&L vs. Cost Basis", f"{cost_basis_pnl:,.2f}")
-st.metric("Est. Buy P&L vs. Cost Basis", f"{cost_basis_buy_pnl:,.2f}")
+st.metric("Est. Sell P&L vs. Cost Basis", f"${cost_basis_pnl:,.2f} MXN")
+st.metric("Est. Buy P&L vs. Cost Basis", f"${cost_basis_buy_pnl:,.2f} MXN")
 
 # Cumulative P&L estimation (simplified model)
 st.subheader("📊 Estimated Cumulative P&L")
 est_pnl = (sell_avg - buy_avg) * sell_qty if not np.isnan(sell_avg) and not np.isnan(buy_avg) else 0.0
-st.metric("Estimated P&L (MXN)", f"{est_pnl:,.2f}")
+st.metric("Estimated P&L (MXN)", f"${est_pnl:,.2f} MXN")
 
 # Dashboard header
 st.title("📊 Bitso Liquidity Bot Dashboard")
-st.metric("Total Sell MXN", f"{sell_mxn:,.2f}")
-st.metric("Total Sell USD", f"{buy_usd:,.2f}")
+st.metric("Total Sell MXN", f"${sell_mxn:,.2f} MXN")
+st.metric("Total Sell USD", f"${buy_usd:,.2f} USD")
 
 # Trade log chart
 st.subheader("Trade Volume Over Time")
