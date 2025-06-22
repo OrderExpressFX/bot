@@ -21,6 +21,7 @@ data = data.dropna()
 
 # Dashboard controls
 st.sidebar.title("Trading Controls")
+bot_mode = st.sidebar.selectbox("Select Bot Mode", ["Micro-Trading Bot", "Position Exit Bot"], index=1)
 autonomous_mode = st.sidebar.toggle("🤖 Autonomous Trading Mode", value=False)
 next_trade_time = st.sidebar.time_input("Next Trade Time (estimate)", value=datetime.now().time())
 st.sidebar.title("Trading Controls")
@@ -34,6 +35,21 @@ target_sell_usd = st.sidebar.number_input("Target Sell USD (USD)", min_value=0.0
 st.sidebar.caption(f"Entered: **${target_sell_usd:,.2f} USD**")
 cost_basis = st.sidebar.number_input("USD/MXN Cost Basis", min_value=0.0, value=18.0000, format="%0.4f")
 block_size = st.sidebar.number_input("Suggested Trade Block Size (MXN)", min_value=10000.0, value=500000.0, step=10000.0, format="%.2f", help="e.g. 500,000.00")
+st.sidebar.caption(f"Entered: **${block_size:,.2f} MXN**")
+
+# Strategy-specific parameters
+if bot_mode == "Micro-Trading Bot":
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Micro Bot Settings")
+    micro_slippage_tolerance = st.sidebar.slider("Max Slippage (pips)", min_value=1, max_value=10, value=5)
+    micro_max_orders = st.sidebar.slider("Max Orders per Hour", min_value=1, max_value=20, value=6)
+    micro_trade_freq = st.sidebar.selectbox("Trade Frequency", ["1 min", "3 min", "5 min", "10 min"], index=2)
+
+elif bot_mode == "Position Exit Bot":
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Position Exit Settings")
+    exit_strategy = st.sidebar.selectbox("Execution Strategy", ["Evenly Distributed", "Opportunistic", "Volatility-Aware"], index=1)
+    execution_interval = st.sidebar.slider("Execution Interval (minutes)", min_value=5, max_value=120, value=60, step=5)
 st.sidebar.caption(f"Entered: **${block_size:,.2f} MXN**")
 
 # Exposure logic
@@ -79,6 +95,30 @@ latest_vol = data['rolling_vol'].iloc[-1] if not data['rolling_vol'].isna().all(
 st.metric("Recent Volatility (10 trades)", f"{latest_vol:.6f}")
 
 # Recommended action
+st.subheader("🤖 Active Bot Mode")
+st.markdown(f"**Mode:** {bot_mode}")
+
+# Branch logic for each bot type
+if bot_mode == "Micro-Trading Bot":
+    st.info("Running micro-trading strategy. Small blocks, frequent trades.")
+    # Example placeholder logic
+    if latest_vol > 0.04:
+        st.warning("Volatility too high. Suggest: Pause micro trades.")
+    elif sell_price_deviation > 0:
+        st.success(f"Micro-trade opportunity detected. SELL {block_size:,.0f} MXN")
+    else:
+        st.info("No edge. Holding position.")
+
+elif bot_mode == "Position Exit Bot":
+    st.info("Running position-exit strategy. Time-weighted execution of large position.")
+    remaining_target = max(0.0, target_sell_mxn - sell_mxn)
+    if remaining_target > 0 and sell_price_deviation >= 0:
+        suggested_sell = min(block_size, remaining_target)
+        st.success(f"Suggest: SELL {suggested_sell:,.0f} MXN block to exit position")
+    elif remaining_target <= 0:
+        st.success("✅ Position Exit Complete for Today")
+    else:
+        st.warning("Price below cost basis. Holding for better conditions.")
 st.subheader("🧠 Trade Suggestion Engine")
 if latest_vol > 0.04:
     st.info("Market is volatile. Suggest: Reduce block size or delay next trade.")
