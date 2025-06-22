@@ -39,8 +39,12 @@ buy_usd = (data[data['side'] == 'buy']['amount'] * data[data['side'] == 'buy']['
 st.sidebar.markdown("### 📈 Trade Fulfillment")
 sell_progress = min(sell_mxn / target_sell_mxn, 1.0)
 buy_progress = min(buy_usd / target_sell_usd, 1.0)
-st.sidebar.progress(sell_progress, text=f"Sell MXN Progress: {sell_mxn:,.0f} / {target_sell_mxn:,.0f}")
-st.sidebar.progress(buy_progress, text=f"Sell USD Progress: {buy_usd:,.0f} / {target_sell_usd:,.0f}")
+sell_color = 'green' if sell_progress >= 0.8 else 'orange' if sell_progress >= 0.5 else 'red'
+st.sidebar.markdown(f"<span style='color:{sell_color}; font-weight:bold;'>Sell MXN Progress: ${sell_mxn:,.0f} / ${target_sell_mxn:,.0f} MXN</span>", unsafe_allow_html=True)
+st.sidebar.progress(sell_progress)
+buy_color = 'green' if buy_progress >= 0.8 else 'orange' if buy_progress >= 0.5 else 'red'
+st.sidebar.markdown(f"<span style='color:{buy_color}; font-weight:bold;'>Sell USD Progress: ${buy_usd:,.0f} / ${target_sell_usd:,.0f} USD</span>", unsafe_allow_html=True)
+st.sidebar.progress(buy_progress)
 
 # Alerts
 if sell_mxn >= mxn_exposure_limit:
@@ -91,13 +95,16 @@ st.metric("Avg Buy vs. Cost Basis", f"{buy_price_deviation:.4f}")
 # Profit/loss using cost basis
 cost_basis_pnl = (sell_avg - cost_basis) * sell_qty if not np.isnan(sell_avg) else 0.0
 cost_basis_buy_pnl = (cost_basis - buy_avg) * data[data['side'] == 'buy']['amount'].sum() if not np.isnan(buy_avg) else 0.0
-st.metric("Est. Sell P&L vs. Cost Basis", f"${cost_basis_pnl:,.2f} MXN")
-st.metric("Est. Buy P&L vs. Cost Basis", f"${cost_basis_buy_pnl:,.2f} MXN")
+sell_pnl_color = 'green' if cost_basis_pnl >= 0 else 'red'
+st.metric("Est. Sell P&L vs. Cost Basis", f"${cost_basis_pnl:,.2f} MXN", delta_color=sell_pnl_color)
+buy_pnl_color = 'green' if cost_basis_buy_pnl >= 0 else 'red'
+st.metric("Est. Buy P&L vs. Cost Basis", f"${cost_basis_buy_pnl:,.2f} MXN", delta_color=buy_pnl_color)
 
 # Cumulative P&L estimation (simplified model)
 st.subheader("📊 Estimated Cumulative P&L")
 est_pnl = (sell_avg - buy_avg) * sell_qty if not np.isnan(sell_avg) and not np.isnan(buy_avg) else 0.0
-st.metric("Estimated P&L (MXN)", f"${est_pnl:,.2f} MXN")
+pnl_color = 'green' if est_pnl >= 0 else 'red'
+st.metric("Estimated P&L (MXN)", f"${est_pnl:,.2f} MXN", delta_color=pnl_color)
 
 # Dashboard header
 st.title("📊 Bitso Liquidity Bot Dashboard")
