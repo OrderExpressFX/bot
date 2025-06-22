@@ -46,6 +46,24 @@ buy_color = 'green' if buy_progress >= 0.8 else 'orange' if buy_progress >= 0.5 
 st.sidebar.markdown(f"<span style='color:{buy_color}; font-weight:bold;'>Sell USD Progress: ${buy_usd:,.0f} / ${target_sell_usd:,.0f} USD</span>", unsafe_allow_html=True)
 st.sidebar.progress(buy_progress)
 
+# Donut chart for fulfillment
+st.subheader("🎯 Target Fulfillment Overview")
+import altair as alt
+fulfillment_df = pd.DataFrame({
+    'Currency': ['MXN', 'USD'],
+    'Progress': [sell_progress * 100, buy_progress * 100],
+    'Remaining': [100 - sell_progress * 100, 100 - buy_progress * 100]
+})
+
+for curr in ['MXN', 'USD']:
+    chart_data = fulfillment_df[fulfillment_df['Currency'] == curr].melt(id_vars='Currency', var_name='Type', value_name='Percent')
+    donut = alt.Chart(chart_data).mark_arc(innerRadius=50).encode(
+        theta=alt.Theta(field="Percent", type="quantitative"),
+        color=alt.Color(field="Type", type="nominal", scale=alt.Scale(scheme='tableau20')),
+        tooltip=['Type:N', 'Percent:Q']
+    ).properties(title=f"{curr} Daily Target")
+    st.altair_chart(donut, use_container_width=True)
+
 # Alerts
 if sell_mxn >= mxn_exposure_limit:
     st.warning(f"⚠️ MXN exposure limit reached: ${sell_mxn:,.2f} / ${mxn_exposure_limit:,.2f} MXN")
