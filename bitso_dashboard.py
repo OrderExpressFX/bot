@@ -21,10 +21,13 @@ data = data.dropna()
 
 # Dashboard controls
 st.sidebar.title("Trading Controls")
+autonomous_mode = st.sidebar.toggle("🤖 Autonomous Trading Mode", value=False)
+next_trade_time = st.sidebar.time_input("Next Trade Time (estimate)", value=datetime.now().time())
+st.sidebar.title("Trading Controls")
 mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure", min_value=0.0, value=8000000.0)
 usd_exposure_limit = st.sidebar.number_input("Max USD Exposure", min_value=0.0, value=450000.0)
 target_sell_mxn = st.sidebar.number_input("Target Sell MXN", min_value=0.0, value=8000000.0)
-target_buy_usd = st.sidebar.number_input("Target Buy USD", min_value=0.0, value=450000.0)
+target_sell_usd = st.sidebar.number_input("Target Sell USD", min_value=0.0, value=450000.0)
 cost_basis = st.sidebar.number_input("USD/MXN Cost Basis", min_value=0.0, value=18.0000, format="%0.4f")
 block_size = st.sidebar.number_input("Suggested Trade Block Size (MXN)", min_value=10000.0, value=500000.0, step=10000.0)
 
@@ -35,9 +38,9 @@ buy_usd = (data[data['side'] == 'buy']['amount'] * data[data['side'] == 'buy']['
 # Progress toward daily target
 st.sidebar.markdown("### 📈 Trade Fulfillment")
 sell_progress = min(sell_mxn / target_sell_mxn, 1.0)
-buy_progress = min(buy_usd / target_buy_usd, 1.0)
+buy_progress = min(buy_usd / target_sell_usd, 1.0)
 st.sidebar.progress(sell_progress, text=f"Sell MXN Progress: {sell_mxn:,.0f} / {target_sell_mxn:,.0f}")
-st.sidebar.progress(buy_progress, text=f"Buy USD Progress: {buy_usd:,.0f} / {target_buy_usd:,.0f}")
+st.sidebar.progress(buy_progress, text=f"Sell USD Progress: {buy_usd:,.0f} / {target_sell_usd:,.0f}")
 
 # Alerts
 if sell_mxn >= mxn_exposure_limit:
@@ -46,8 +49,8 @@ if buy_usd >= usd_exposure_limit:
     st.warning(f"⚠️ USD exposure limit reached: {buy_usd:.2f} / {usd_exposure_limit:.2f}")
 if sell_mxn >= target_sell_mxn:
     st.success(f"✅ Target Sell MXN achieved: {sell_mxn:.2f} / {target_sell_mxn:.2f}")
-if buy_usd >= target_buy_usd:
-    st.success(f"✅ Target Buy USD achieved: {buy_usd:.2f} / {target_buy_usd:.2f}")
+if buy_usd >= target_sell_usd:
+    st.success(f"✅ Target Sell USD achieved: {buy_usd:.2f} / {target_sell_usd:.2f}")
 
 # Bitso balance fetch (mocked API call)
 st.subheader("📡 Bitso Account Balances (demo)")
@@ -99,21 +102,48 @@ st.metric("Estimated P&L (MXN)", f"{est_pnl:,.2f}")
 # Dashboard header
 st.title("📊 Bitso Liquidity Bot Dashboard")
 st.metric("Total Sell MXN", f"{sell_mxn:,.2f}")
-st.metric("Total Buy USD", f"{buy_usd:,.2f}")
+st.metric("Total Sell USD", f"{buy_usd:,.2f}")
 
 # Trade log chart
 st.subheader("Trade Volume Over Time")
-data.set_index("timestamp", inplace=True)
-volume_chart = data.groupby([pd.Grouper(freq='H'), 'side'])['amount'].sum().unstack().fillna(0)
-st.line_chart(volume_chart)
+import altair as alt
+volume_chart_reset = volume_chart.reset_index().melt(id_vars='timestamp', var_name='Side', value_name='Amount')
+line_chart = alt.Chart(volume_chart_reset).mark_line().encode(
+    x='timestamp:T',
+    y=alt.Y('Amount:Q', title='Trade Volume'),
+    color='Side:N',
+    tooltip=['timestamp:T', 'Side:N', 'Amount:Q']
+).interactive()
+
+price_overlay = data['price'].resample('H').mean().reset_index()
+price_line = alt.Chart(price_overlay).mark_line(color='gray', strokeDash=[5, 5]).encode(
+    x='timestamp:T',
+    y=alt.Y('price:Q', axis=alt.Axis(title='USD/MXN Rate'), scale=alt.Scale(zero=False)),
+    tooltip=['timestamp:T', alt.Tooltip('price:Q', format='.4f')]
+)
+
+st.altair_chart((line_chart + price_line).resolve_scale(y='independent').properties(height=400), use_container_width=True)
 
 # Hourly analysis
 st.subheader("📅 Hourly Execution Overview")
 data['hour'] = data['timestamp'].dt.hour
 hourly = data.groupby(['hour', 'side'])['amount'].sum().unstack().fillna(0)
+hourly = hourly.applymap(lambda x: round(x, 2))
 st.bar_chart(hourly)
+
+# Bot Activity Log (demo)
+st.subheader("📝 Recent Bot Decisions (Demo)")
+bot_logs = [
+    {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "decision": "Sell 500,000 MXN", "reason": "Price > cost basis"},
+    {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "decision": "Hold", "reason": "High volatility"},
+    {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "decision": "Sell 250,000 MXN", "reason": "Mid-range price stability"},
+]
+st.table(pd.DataFrame(bot_logs))
 
 # Show raw log
 data.reset_index(inplace=True)
 st.subheader("Recent Trades")
-st.dataframe(data.sort_values("timestamp", ascending=False))
+styled_data = data.sort_values("timestamp", ascending=False).copy()
+styled_data["price"] = styled_data["price"].map("{:,.4f}".format)
+styled_data["amount"] = styled_data["amount"].map("{:,.2f}".format)
+st.dataframe(styled_data)
