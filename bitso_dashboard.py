@@ -10,10 +10,14 @@ def load_data():
     try:
         return pd.read_csv("bitso_trades.csv", parse_dates=['timestamp'])
     except FileNotFoundError:
-        return pd.DataFrame(columns=["timestamp", "side", "price", "amount", "order_id"])
+        return pd.DataFrame(columns=["timestamp", "side", "price", "amount", "order_id", "usd_value", "mxn_value"])
 
 # Load and process data
 data = load_data()
+if 'usd_value' not in data.columns:
+    data['usd_value'] = data.apply(lambda row: row['amount'] / cost_basis if row['side'] == 'sell' else row['amount'], axis=1)
+if 'mxn_value' not in data.columns:
+    data['mxn_value'] = data.apply(lambda row: row['amount'] * cost_basis if row['side'] == 'buy' else row['amount'], axis=1)
 data['timestamp'] = pd.to_datetime(data['timestamp'])
 data['amount'] = pd.to_numeric(data['amount'], errors='coerce')
 data['price'] = pd.to_numeric(data['price'], errors='coerce')
@@ -156,7 +160,11 @@ st.metric("Estimated P&L (MXN)", f"${est_pnl:,.2f} MXN", delta=f"${est_pnl:,.2f}
 # Dashboard header
 st.title("📊 Bitso Liquidity Bot Dashboard")
 st.metric("Total Sell MXN", f"${sell_mxn:,.2f} MXN")
+usd_value_of_sells = sell_mxn / cost_basis if cost_basis > 0 else 0.0
+st.metric("USD Value of MXN Sales", f"${usd_value_of_sells:,.2f} USD")
 st.metric("Total Sell USD", f"${buy_usd:,.2f} USD")
+mxn_value_of_usd_buys = buy_usd * cost_basis
+st.metric("MXN Value of USD Buys", f"${mxn_value_of_usd_buys:,.2f} MXN")
 
 # Trade log chart
 st.subheader("Trade Volume Over Time")
