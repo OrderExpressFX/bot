@@ -24,12 +24,12 @@ st.sidebar.title("Trading Controls")
 autonomous_mode = st.sidebar.toggle("🤖 Autonomous Trading Mode", value=False)
 next_trade_time = st.sidebar.time_input("Next Trade Time (estimate)", value=datetime.now().time())
 st.sidebar.title("Trading Controls")
-mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure (MXN)", min_value=0.0, value=8000000.0, format="%.2f")
-usd_exposure_limit = st.sidebar.number_input("Max USD Exposure (USD)", min_value=0.0, value=450000.0, format="%.2f")
-target_sell_mxn = st.sidebar.number_input("Target Sell MXN (MXN)", min_value=0.0, value=8000000.0, format="%.2f")
-target_sell_usd = st.sidebar.number_input("Target Sell USD (USD)", min_value=0.0, value=450000.0, format="%.2f")
+mxn_exposure_limit = st.sidebar.number_input("Max MXN Exposure (MXN)", min_value=0.0, value=8000000.0, format="%.2f", help="e.g. 8,000,000.00")
+usd_exposure_limit = st.sidebar.number_input("Max USD Exposure (USD)", min_value=0.0, value=450000.0, format="%.2f", help="e.g. 450,000.00")
+target_sell_mxn = st.sidebar.number_input("Target Sell MXN (MXN)", min_value=0.0, value=8000000.0, format="%.2f", help="e.g. 8,000,000.00")
+target_sell_usd = st.sidebar.number_input("Target Sell USD (USD)", min_value=0.0, value=450000.0, format="%.2f", help="e.g. 450,000.00")
 cost_basis = st.sidebar.number_input("USD/MXN Cost Basis", min_value=0.0, value=18.0000, format="%0.4f")
-block_size = st.sidebar.number_input("Suggested Trade Block Size (MXN)", min_value=10000.0, value=500000.0, step=10000.0, format="%.2f")
+block_size = st.sidebar.number_input("Suggested Trade Block Size (MXN)", min_value=10000.0, value=500000.0, step=10000.0, format="%.2f", help="e.g. 500,000.00")
 
 # Exposure logic
 sell_mxn = data[data['side'] == 'sell']['amount'].sum()
@@ -46,23 +46,7 @@ buy_color = 'green' if buy_progress >= 0.8 else 'orange' if buy_progress >= 0.5 
 st.sidebar.markdown(f"<span style='color:{buy_color}; font-weight:bold;'>Sell USD Progress: ${buy_usd:,.0f} / ${target_sell_usd:,.0f} USD</span>", unsafe_allow_html=True)
 st.sidebar.progress(buy_progress)
 
-# Donut chart for fulfillment
-st.subheader("🎯 Target Fulfillment Overview")
-import altair as alt
-fulfillment_df = pd.DataFrame({
-    'Currency': ['MXN', 'USD'],
-    'Progress': [sell_progress * 100, buy_progress * 100],
-    'Remaining': [100 - sell_progress * 100, 100 - buy_progress * 100]
-})
 
-for curr in ['MXN', 'USD']:
-    chart_data = fulfillment_df[fulfillment_df['Currency'] == curr].melt(id_vars='Currency', var_name='Type', value_name='Percent')
-    donut = alt.Chart(chart_data).mark_arc(innerRadius=50).encode(
-        theta=alt.Theta(field="Percent", type="quantitative"),
-        color=alt.Color(field="Type", type="nominal", scale=alt.Scale(scheme='tableau20')),
-        tooltip=['Type:N', 'Percent:Q']
-    ).properties(title=f"{curr} Daily Target")
-    st.altair_chart(donut, use_container_width=True)
 
 # Alerts
 if sell_mxn >= mxn_exposure_limit:
@@ -114,15 +98,15 @@ st.metric("Avg Buy vs. Cost Basis", f"{buy_price_deviation:.4f}")
 cost_basis_pnl = (sell_avg - cost_basis) * sell_qty if not np.isnan(sell_avg) else 0.0
 cost_basis_buy_pnl = (cost_basis - buy_avg) * data[data['side'] == 'buy']['amount'].sum() if not np.isnan(buy_avg) else 0.0
 sell_pnl_color = 'green' if cost_basis_pnl >= 0 else 'red'
-st.metric("Est. Sell P&L vs. Cost Basis", f"${cost_basis_pnl:,.2f} MXN", delta_color=sell_pnl_color)
+st.metric("Est. Sell P&L vs. Cost Basis", f"${cost_basis_pnl:,.2f} MXN", delta=f"${cost_basis_pnl:,.2f}", delta_color=sell_pnl_color)
 buy_pnl_color = 'green' if cost_basis_buy_pnl >= 0 else 'red'
-st.metric("Est. Buy P&L vs. Cost Basis", f"${cost_basis_buy_pnl:,.2f} MXN", delta_color=buy_pnl_color)
+st.metric("Est. Buy P&L vs. Cost Basis", f"${cost_basis_buy_pnl:,.2f} MXN", delta=f"${cost_basis_buy_pnl:,.2f}", delta_color=buy_pnl_color)
 
 # Cumulative P&L estimation (simplified model)
 st.subheader("📊 Estimated Cumulative P&L")
 est_pnl = (sell_avg - buy_avg) * sell_qty if not np.isnan(sell_avg) and not np.isnan(buy_avg) else 0.0
 pnl_color = 'green' if est_pnl >= 0 else 'red'
-st.metric("Estimated P&L (MXN)", f"${est_pnl:,.2f} MXN", delta_color=pnl_color)
+st.metric("Estimated P&L (MXN)", f"${est_pnl:,.2f} MXN", delta=f"${est_pnl:,.2f}", delta_color=pnl_color)
 
 # Dashboard header
 st.title("📊 Bitso Liquidity Bot Dashboard")
